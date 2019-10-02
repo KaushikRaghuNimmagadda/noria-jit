@@ -28,42 +28,46 @@
 using namespace llvm;
 using namespace llvm::orc;
 
-//===----------------------------------------------------------------------===//
-// Lexer
-//===----------------------------------------------------------------------===//
 
 // The lexer returns tokens [0-255] if it is an unknown character, otherwise one
 // of these for known things.
 enum Token {
-  tok_eof = -1,
+            tok_eof = -1,
 
-  // commands
-  tok_def = -2,
-  tok_extern = -3,
+            // commands
+            tok_def = -2,
+            tok_extern = -3,
 
-  // primary
-  tok_identifier = -4,
-  tok_number = -5,
+            // primary
+            tok_identifier = -4,
+            tok_number = -5,
 
-  // control
-  tok_if = -6,
-  tok_then = -7,
-  tok_else = -8,
-  tok_for = -9,
-  tok_in = -10,
+            // control
+            tok_if = -6,
+            tok_then = -7,
+            tok_else = -8,
+            tok_for = -9,
+            tok_in = -10,
 
-  // operators
-  tok_binary = -11,
-  tok_unary = -12,
+            // operators
+            tok_binary = -11,
+            tok_unary = -12,
 
-  // var definition
-  tok_var = -13
+            // var definition
+            tok_var = -13,
+
+            // list start '[', matches everything until ']'
+            tok_list = -14
 };
+
 
 static std::string IdentifierStr; // Filled in if tok_identifier
 static double NumVal;             // Filled in if tok_number
+static vector<double> ListVal;
 
-/// gettok - Return the next token from standard input.
+static int CurTok;
+static int getNextToken() { return CurTok = gettok(); }
+
 static int gettok() {
   static int LastChar = ' ';
 
@@ -99,6 +103,33 @@ static int gettok() {
     return tok_identifier;
   }
 
+  // check for list start
+  if(LastChar == '[') {
+    std::string NumStr;
+    while(LastChar != ']') {
+      LastChar = getchar();
+      do {
+        NumStr += LastChar;
+        LastChar = getchar();
+      } while (isdigit(LastChar) || LastChar == '.');
+      // at this point, we should either have LC at a comma or the end
+      // of the list
+      assert(LastChar == ',' || LastChar == ']');
+      // handle empty list
+      if(NumStr != "]") {
+        NumVal = strtod(NumStr.c_str(), nullptr);
+        ListVal.push_back(NumVal);
+      }
+    }
+
+    std::cout << "Finished parsing list" << "\n";
+    for(const double& f : ListVal) {
+      std::cout << f << "\n";
+    }
+
+    return tok_list;
+  }
+
   if (isdigit(LastChar) || LastChar == '.') { // Number: [0-9.]+
     std::string NumStr;
     do {
@@ -129,6 +160,8 @@ static int gettok() {
   LastChar = getchar();
   return ThisChar;
 }
+
+
 
 //===----------------------------------------------------------------------===//
 // Abstract Syntax Tree (aka Parse Tree)
